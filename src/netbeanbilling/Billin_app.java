@@ -6,6 +6,10 @@
 package netbeanbilling;
 
 import java.awt.Frame;
+import java.util.Date;
+import java.awt.print.PrinterException;
+import java.sql.*;
+import javax.swing.JOptionPane;
 
 /**
  *
@@ -21,10 +25,101 @@ public class Billin_app extends javax.swing.JFrame {
         initComponents();
         setExtendedState(MAXIMIZED_BOTH);
         setUndecorated(true);
+        connectToDatabase();
 //        Bill.setVisible(false);
 //        Customer.setVisible(false);
 //        History.setVisible(false);
         
+    }
+    private int total=0;
+    private int wallet = 0;
+    private Connection connection;
+
+    // Connect to the MySQL database
+    private void connectToDatabase() {
+        try {
+            connection = DriverManager.getConnection(
+                "jdbc:mysql://localhost:3306/billing_system", "username", "password"
+            );
+            JOptionPane.showMessageDialog(null,"Connected to database.");
+        } catch (SQLException e) {
+            JOptionPane.showMessageDialog(null,"Database connection failed: " + e.getMessage(), "Error", JOptionPane.ERROR_MESSAGE);
+        }
+    }
+    
+    String getProduct(int id, int cnt){
+        return "";
+    }
+    
+    public String getData(int id){
+        String sql = "SELECT customer_name, wallet_amount WHERE customer_id = ?";
+        try(PreparedStatement stmt = connection.prepareStatement(sql)){
+            stmt.setInt(1, id);
+            ResultSet rs = stmt.executeQuery();
+            if(rs.next()){
+                wallet = rs.getInt("wallet_amount");
+                return id+"\t"+rs.getString("customer_name")+"\nWallet Amount\t"+wallet;
+            }
+        }
+        catch(SQLException e){
+            JOptionPane.showMessageDialog(null, "Error in getting data"+e.getSQLState(), "ERROR", JOptionPane.ERROR_MESSAGE);
+        }
+        return "";
+    }
+    
+
+    // Method to update product details
+    public void updateProduct(int productId, String productName, double costPrice, double sellingPrice) {
+        String sql = "UPDATE products SET product_name = ?, cost_price = ?, selling_price = ? WHERE product_id = ?";
+        try (PreparedStatement stmt = connection.prepareStatement(sql)) {
+            stmt.setString(1, productName);
+            stmt.setDouble(2, costPrice);
+            stmt.setDouble(3, sellingPrice);
+            stmt.setInt(4, productId);
+
+            int rowsUpdated = stmt.executeUpdate();
+            if (rowsUpdated > 0) {
+                JOptionPane.showMessageDialog(null, "Product updated successfully.");
+            } else {
+                JOptionPane.showMessageDialog(null, "Product ID not found.");
+            }
+        } catch (SQLException e) {
+            JOptionPane.showMessageDialog(null, "Error updating product: " + e.getMessage(), "Error", JOptionPane.ERROR_MESSAGE);
+        }
+    }
+
+    // Method to update customer billing details
+    public void updateCustomer(int customerId, double billAmount, String paymentStatus, double walletAmount) {
+        String sql = "UPDATE customers SET bill_amount = ?, payment_status = ?, wallet_amount = ? WHERE customer_id = ?";
+        try (PreparedStatement stmt = connection.prepareStatement(sql)) {
+            stmt.setDouble(1, billAmount);
+            stmt.setString(2, paymentStatus);
+            stmt.setDouble(3, walletAmount);
+            stmt.setInt(4, customerId);
+
+            int rowsUpdated = stmt.executeUpdate();
+            if (rowsUpdated > 0) {
+                JOptionPane.showMessageDialog(null,"Customer updated successfully.");
+            } else {
+                JOptionPane.showMessageDialog(null,"Customer ID not found.");
+            }
+        } catch (SQLException e) {
+            JOptionPane.showMessageDialog(null,"Error updating customer: " + e.getMessage(), "Error", JOptionPane.ERROR_MESSAGE);
+        }
+    }
+    void update(){
+        updateCustomer(Integer.parseInt(Pcnt6.getText()), total, "true", wallet+(total/100));
+    }
+    // Main method for testing
+    public void printBill(String details) {
+        try {
+            jTextArea6.append(details);
+            boolean complete = jTextArea6.print();  // Triggers print dialog
+            if(complete){
+                update();
+            }
+        } catch (PrinterException e) {
+        }
     }
 
     /**
@@ -56,6 +151,11 @@ public class Billin_app extends javax.swing.JFrame {
         jScrollPane7 = new javax.swing.JScrollPane();
         jTextArea6 = new javax.swing.JTextArea();
         jLabel28 = new javax.swing.JLabel();
+        addButton = new javax.swing.JButton();
+        jButton2 = new javax.swing.JButton();
+        jButton3 = new javax.swing.JButton();
+        Pcnt6 = new javax.swing.JTextField();
+        jLabel2 = new javax.swing.JLabel();
 
         jLabel5.setText("jLabel2");
 
@@ -146,12 +246,43 @@ public class Billin_app extends javax.swing.JFrame {
 
         jLabel27.setText("Discount");
 
+        jTextArea6.setEditable(false);
         jTextArea6.setColumns(20);
         jTextArea6.setRows(5);
         jScrollPane7.setViewportView(jTextArea6);
 
         jLabel28.setFont(new java.awt.Font("Tahoma", 0, 48)); // NOI18N
         jLabel28.setText("INVOICE");
+
+        addButton.setText("PRINT");
+        addButton.addActionListener(new java.awt.event.ActionListener() {
+            public void actionPerformed(java.awt.event.ActionEvent evt) {
+                addButtonActionPerformed(evt);
+            }
+        });
+
+        jButton2.setText("Exit");
+        jButton2.addActionListener(new java.awt.event.ActionListener() {
+            public void actionPerformed(java.awt.event.ActionEvent evt) {
+                jButton2ActionPerformed(evt);
+            }
+        });
+
+        jButton3.setText("ADD");
+        jButton3.addActionListener(new java.awt.event.ActionListener() {
+            public void actionPerformed(java.awt.event.ActionEvent evt) {
+                jButton3ActionPerformed(evt);
+            }
+        });
+
+        Pcnt6.setPreferredSize(new java.awt.Dimension(100, 22));
+        Pcnt6.addActionListener(new java.awt.event.ActionListener() {
+            public void actionPerformed(java.awt.event.ActionEvent evt) {
+                Pcnt6PcntActionPerformed(evt);
+            }
+        });
+
+        jLabel2.setText("Customer Id");
 
         javax.swing.GroupLayout Bill6Layout = new javax.swing.GroupLayout(Bill6);
         Bill6.setLayout(Bill6Layout);
@@ -160,30 +291,48 @@ public class Billin_app extends javax.swing.JFrame {
             .addGroup(Bill6Layout.createSequentialGroup()
                 .addGroup(Bill6Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
                     .addGroup(Bill6Layout.createSequentialGroup()
+                        .addGap(566, 566, 566)
+                        .addComponent(jLabel28))
+                    .addGroup(Bill6Layout.createSequentialGroup()
                         .addGap(169, 169, 169)
                         .addGroup(Bill6Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING, false)
                             .addComponent(jScrollPane7)
                             .addGroup(Bill6Layout.createSequentialGroup()
-                                .addComponent(jLabel25)
-                                .addGap(50, 50, 50)
-                                .addComponent(pid5, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE)
-                                .addGap(174, 174, 174)
-                                .addComponent(jLabel26)
-                                .addGap(50, 50, 50)
-                                .addComponent(Pcnt5, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE)
-                                .addGap(174, 174, 174)
-                                .addComponent(jLabel27)
-                                .addGap(50, 50, 50)
-                                .addComponent(dct5, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE))))
-                    .addGroup(Bill6Layout.createSequentialGroup()
-                        .addGap(566, 566, 566)
-                        .addComponent(jLabel28)))
-                .addContainerGap(169, Short.MAX_VALUE))
+                                .addComponent(addButton)
+                                .addGap(423, 423, 423)
+                                .addComponent(jButton2)
+                                .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)
+                                .addComponent(jButton3))
+                            .addGroup(Bill6Layout.createSequentialGroup()
+                                .addGroup(Bill6Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
+                                    .addGroup(Bill6Layout.createSequentialGroup()
+                                        .addComponent(jLabel25)
+                                        .addGap(50, 50, 50)
+                                        .addComponent(pid5, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE)
+                                        .addGap(174, 174, 174)
+                                        .addComponent(jLabel26)
+                                        .addGap(50, 50, 50))
+                                    .addGroup(javax.swing.GroupLayout.Alignment.TRAILING, Bill6Layout.createSequentialGroup()
+                                        .addComponent(jLabel2)
+                                        .addGap(60, 60, 60)))
+                                .addGroup(Bill6Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
+                                    .addComponent(Pcnt6, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE)
+                                    .addGroup(Bill6Layout.createSequentialGroup()
+                                        .addComponent(Pcnt5, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE)
+                                        .addGap(174, 174, 174)
+                                        .addComponent(jLabel27)
+                                        .addGap(50, 50, 50)
+                                        .addComponent(dct5, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE)))))))
+                .addContainerGap(170, Short.MAX_VALUE))
         );
         Bill6Layout.setVerticalGroup(
             Bill6Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
             .addGroup(Bill6Layout.createSequentialGroup()
-                .addGap(34, 34, 34)
+                .addContainerGap()
+                .addGroup(Bill6Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.BASELINE)
+                    .addComponent(Pcnt6, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE)
+                    .addComponent(jLabel2))
+                .addGap(18, 18, 18)
                 .addGroup(Bill6Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
                     .addGroup(Bill6Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.BASELINE)
                         .addComponent(jLabel27)
@@ -196,8 +345,14 @@ public class Billin_app extends javax.swing.JFrame {
                         .addComponent(pid5, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE)))
                 .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
                 .addComponent(jLabel28)
-                .addGap(0, 0, 0)
-                .addComponent(jScrollPane7, javax.swing.GroupLayout.DEFAULT_SIZE, 612, Short.MAX_VALUE))
+                .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)
+                .addComponent(jScrollPane7, javax.swing.GroupLayout.PREFERRED_SIZE, 578, javax.swing.GroupLayout.PREFERRED_SIZE)
+                .addGap(9, 9, 9)
+                .addGroup(Bill6Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.BASELINE)
+                    .addComponent(addButton)
+                    .addComponent(jButton2)
+                    .addComponent(jButton3))
+                .addGap(11, 11, 11))
         );
 
         javax.swing.GroupLayout layout = new javax.swing.GroupLayout(getContentPane());
@@ -216,7 +371,7 @@ public class Billin_app extends javax.swing.JFrame {
         layout.setVerticalGroup(
             layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
             .addGroup(javax.swing.GroupLayout.Alignment.TRAILING, layout.createSequentialGroup()
-                .addContainerGap(15, Short.MAX_VALUE)
+                .addContainerGap(javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)
                 .addComponent(jLabel1, javax.swing.GroupLayout.PREFERRED_SIZE, 86, javax.swing.GroupLayout.PREFERRED_SIZE)
                 .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
                 .addComponent(Bill6, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE)
@@ -227,6 +382,29 @@ public class Billin_app extends javax.swing.JFrame {
     private void PcntActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_PcntActionPerformed
         // TODO add your handling code here:
     }//GEN-LAST:event_PcntActionPerformed
+
+    private void jButton3ActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_jButton3ActionPerformed
+        // TODO add your handling code here:
+        jTextArea6.append("Store Name\n"+new Date());
+        jTextArea6.append(pid5.getText()+ getProduct(Integer.parseInt(pid5.getText()), Integer.parseInt(Pcnt5.getText())));
+        jTextArea6.append("=============================\nTotal\t"+total);
+        
+    }//GEN-LAST:event_jButton3ActionPerformed
+
+    private void jButton2ActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_jButton2ActionPerformed
+        // TODO add your handling code here:
+        System.exit(0);
+    }//GEN-LAST:event_jButton2ActionPerformed
+
+    private void addButtonActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_addButtonActionPerformed
+        // TODO add your handling code here:
+        
+        printBill(getData(Integer.parseInt(Pcnt6.getText())));
+    }//GEN-LAST:event_addButtonActionPerformed
+
+    private void Pcnt6PcntActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_Pcnt6PcntActionPerformed
+        // TODO add your handling code here:
+    }//GEN-LAST:event_Pcnt6PcntActionPerformed
 
     /**
      * @param args the command line arguments
@@ -267,8 +445,13 @@ public class Billin_app extends javax.swing.JFrame {
     private javax.swing.JPanel Bill1;
     private javax.swing.JPanel Bill6;
     private javax.swing.JTextField Pcnt5;
+    private javax.swing.JTextField Pcnt6;
+    private javax.swing.JButton addButton;
     private javax.swing.JTextField dct5;
+    private javax.swing.JButton jButton2;
+    private javax.swing.JButton jButton3;
     private javax.swing.JLabel jLabel1;
+    private javax.swing.JLabel jLabel2;
     private javax.swing.JLabel jLabel25;
     private javax.swing.JLabel jLabel26;
     private javax.swing.JLabel jLabel27;

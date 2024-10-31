@@ -31,7 +31,7 @@ public class Billin_app extends javax.swing.JFrame {
         StyleConstants.setAlignment(center, StyleConstants.ALIGN_CENTER);
         StyledDocument doc = jTextPane1.getStyledDocument();
         doc.setParagraphAttributes(0, doc.getLength(), center, false);
-        jTextPane1.setText("Store Name\n"+new Date()+"\nProduct Id  Product Name  Price  Cost\n");
+        jTextPane1.setText("Store Name\n"+new Date()+"\nProduct Id  Product Name  Price  Cost\n\n");
         connectToDatabase();
 //        Bill.setVisible(false);
 //        Customer.setVisible(false);
@@ -99,7 +99,7 @@ public class Billin_app extends javax.swing.JFrame {
         } catch (SQLException e) {
             JOptionPane.showMessageDialog(null, "Error in getting or inserting customer data: " + e.getMessage(), "ERROR", JOptionPane.ERROR_MESSAGE);
         }
-        return id + "\t" + name + "\nWallet Amount: " + wallet;
+        return id + "\t" + name + "\nWallet Amount: " + wallet+"/n";
     }
 
     // Method to update product details
@@ -160,6 +160,7 @@ public class Billin_app extends javax.swing.JFrame {
 
         try {
             doc.insertString(doc.getLength(), details, center);
+            doc.insertString(doc.getLength(), "=================\nTotal\t\t"+total, center);
         } catch (BadLocationException e) {
             e.printStackTrace();
         }

@@ -10,6 +10,10 @@ import java.util.Date;
 import java.awt.print.PrinterException;
 import java.sql.*;
 import javax.swing.JOptionPane;
+import javax.swing.text.BadLocationException;
+import javax.swing.text.SimpleAttributeSet;
+import javax.swing.text.StyleConstants;
+import javax.swing.text.StyledDocument;
 
 /**
  *
@@ -25,48 +29,80 @@ public class Billin_app extends javax.swing.JFrame {
         initComponents();
         setExtendedState(MAXIMIZED_BOTH);
         setUndecorated(true);
+        SimpleAttributeSet center = new SimpleAttributeSet();
+        StyleConstants.setAlignment(center, StyleConstants.ALIGN_CENTER);
+        StyledDocument doc = jTextPane1.getStyledDocument();
+        doc.setParagraphAttributes(0, doc.getLength(), center, false);
+        jTextPane1.setText("Store Name\n"+new Date()+"\nProduct Id  Product Name  Price  Cost\n");
         connectToDatabase();
 //        Bill.setVisible(false);
 //        Customer.setVisible(false);
 //        History.setVisible(false);
         
     }
-    private int total=0;
-    private int wallet = 0;
+    private float total = 0;
+    private float wallet = 0;
     private Connection connection;
 
     // Connect to the MySQL database
     private void connectToDatabase() {
         try {
             connection = DriverManager.getConnection(
-                "jdbc:mysql://localhost:3306/billing_system", "username", "password"
+                "jdbc:mysql://localhost:3306/billing_system", "root", "0221" // update with your username and password
             );
-            JOptionPane.showMessageDialog(null,"Connected to database.");
+            JOptionPane.showMessageDialog(null, "Connected to database.");
         } catch (SQLException e) {
-            JOptionPane.showMessageDialog(null,"Database connection failed: " + e.getMessage(), "Error", JOptionPane.ERROR_MESSAGE);
+            JOptionPane.showMessageDialog(null, "Database connection failed: " + e.getMessage(), "Error", JOptionPane.ERROR_MESSAGE);
         }
     }
-    
-    String getProduct(int id, int cnt){
-        return "";
-    }
-    
-    public String getData(int id){
-        String sql = "SELECT customer_name, wallet_amount WHERE customer_id = ?";
-        try(PreparedStatement stmt = connection.prepareStatement(sql)){
+
+    // Get product details based on product ID and quantity
+    String getProduct(int id, int cnt) {
+        String sql = "SELECT product_name, selling_price FROM products WHERE product_id = ?";
+        float price = 0, tprice = 0;
+        String name = "";
+        try (PreparedStatement stmt = connection.prepareStatement(sql)) {
             stmt.setInt(1, id);
             ResultSet rs = stmt.executeQuery();
-            if(rs.next()){
-                wallet = rs.getInt("wallet_amount");
-                return id+"\t"+rs.getString("customer_name")+"\nWallet Amount\t"+wallet;
+            if (rs.next()) {
+                price = rs.getFloat("selling_price");
+                name = rs.getString("product_name");
+                tprice = price * cnt;
+                total += tprice;
             }
+        } catch (SQLException e) {
+            JOptionPane.showMessageDialog(null, "Error in getting product data: " + e.getMessage(), "ERROR", JOptionPane.ERROR_MESSAGE);
         }
-        catch(SQLException e){
-            JOptionPane.showMessageDialog(null, "Error in getting data"+e.getSQLState(), "ERROR", JOptionPane.ERROR_MESSAGE);
-        }
-        return "";
+        return id + "   " + name + "   " + price + "   " + tprice + "\n";
     }
-    
+
+    // Get customer data and insert new customer if not found
+    public String getData(int id) {
+        String sql = "SELECT customer_name, wallet_amount FROM customers WHERE customer_id = ?";
+        String name = "";
+        try (PreparedStatement stmt = connection.prepareStatement(sql)) {
+            stmt.setInt(1, id);
+            ResultSet rs = stmt.executeQuery();
+            if (rs.next()) {
+                wallet = rs.getFloat("wallet_amount");
+                name = rs.getString("customer_name");
+            } else {
+                // Insert new customer if not found
+                sql = "INSERT INTO customers (customer_id, customer_name, wallet_amount) VALUES (?, ?, 0)";
+                try (PreparedStatement insertStmt = connection.prepareStatement(sql)) {
+                    insertStmt.setInt(1, id);
+                    insertStmt.setString(2, "CustomerNameHere"); // Replace with input text for name
+                    insertStmt.execute();
+                    JOptionPane.showMessageDialog(null, "New customer inserted.");
+                    name = "CustomerNameHere"; // Replace with the input text
+                    wallet = 0;
+                }
+            }
+        } catch (SQLException e) {
+            JOptionPane.showMessageDialog(null, "Error in getting or inserting customer data: " + e.getMessage(), "ERROR", JOptionPane.ERROR_MESSAGE);
+        }
+        return id + "\t" + name + "\nWallet Amount: " + wallet;
+    }
 
     // Method to update product details
     public void updateProduct(int productId, String productName, double costPrice, double sellingPrice) {
@@ -89,36 +125,52 @@ public class Billin_app extends javax.swing.JFrame {
     }
 
     // Method to update customer billing details
-    public void updateCustomer(int customerId, double billAmount, String paymentStatus, double walletAmount) {
+    public void updateCustomer(int customerId, float billAmount, String paymentStatus, float walletAmount) {
         String sql = "UPDATE customers SET bill_amount = ?, payment_status = ?, wallet_amount = ? WHERE customer_id = ?";
         try (PreparedStatement stmt = connection.prepareStatement(sql)) {
-            stmt.setDouble(1, billAmount);
+            stmt.setFloat(1, billAmount);
             stmt.setString(2, paymentStatus);
-            stmt.setDouble(3, walletAmount);
+            stmt.setFloat(3, walletAmount);
             stmt.setInt(4, customerId);
 
             int rowsUpdated = stmt.executeUpdate();
             if (rowsUpdated > 0) {
-                JOptionPane.showMessageDialog(null,"Customer updated successfully.");
+                JOptionPane.showMessageDialog(null, "Customer updated successfully.");
             } else {
-                JOptionPane.showMessageDialog(null,"Customer ID not found.");
+                JOptionPane.showMessageDialog(null, "Customer ID not found.");
             }
         } catch (SQLException e) {
-            JOptionPane.showMessageDialog(null,"Error updating customer: " + e.getMessage(), "Error", JOptionPane.ERROR_MESSAGE);
+            JOptionPane.showMessageDialog(null, "Error updating customer: " + e.getMessage(), "Error", JOptionPane.ERROR_MESSAGE);
         }
     }
-    void update(){
-        updateCustomer(Integer.parseInt(Pcnt6.getText()), total, "true", wallet+(total/100));
+
+    // Method to apply updates after printing
+    void update() {
+        int customerId = Integer.parseInt("CustomerIDHere"); // Replace with actual input for customer ID
+        updateCustomer(customerId, total, "Paid", wallet + (total / 100));
     }
-    // Main method for testing
+
+    // Print bill to JTextArea and update customer if successful
     public void printBill(String details) {
+        try { // Initialize JTextArea for example
+            StyledDocument doc = jTextPane1.getStyledDocument();
+
+        // Center alignment attribute set
+        SimpleAttributeSet center = new SimpleAttributeSet();
+        StyleConstants.setAlignment(center, StyleConstants.ALIGN_CENTER);
+        doc.setParagraphAttributes(0, doc.getLength(), center, false);
+
         try {
-            jTextArea6.append(details);
-            boolean complete = jTextArea6.print();  // Triggers print dialog
-            if(complete){
-                update();
+            doc.insertString(doc.getLength(), details, center);
+        } catch (BadLocationException e) {
+            e.printStackTrace();
+        }
+            boolean complete = jTextPane1.print();  // Triggers print dialog
+            if (complete) {
+                update(); // Update customer wallet and billing if print is successful
             }
-        } catch (PrinterException e) {
+        } catch (Exception e) {
+            JOptionPane.showMessageDialog(null, "Printing failed: " + e.getMessage(), "Error", JOptionPane.ERROR_MESSAGE);
         }
     }
 
@@ -148,14 +200,16 @@ public class Billin_app extends javax.swing.JFrame {
         jLabel26 = new javax.swing.JLabel();
         dct5 = new javax.swing.JTextField();
         jLabel27 = new javax.swing.JLabel();
-        jScrollPane7 = new javax.swing.JScrollPane();
-        jTextArea6 = new javax.swing.JTextArea();
         jLabel28 = new javax.swing.JLabel();
         addButton = new javax.swing.JButton();
         jButton2 = new javax.swing.JButton();
         jButton3 = new javax.swing.JButton();
         Pcnt6 = new javax.swing.JTextField();
         jLabel2 = new javax.swing.JLabel();
+        jLabel3 = new javax.swing.JLabel();
+        dct6 = new javax.swing.JTextField();
+        jScrollPane1 = new javax.swing.JScrollPane();
+        jTextPane1 = new javax.swing.JTextPane();
 
         jLabel5.setText("jLabel2");
 
@@ -246,11 +300,6 @@ public class Billin_app extends javax.swing.JFrame {
 
         jLabel27.setText("Discount");
 
-        jTextArea6.setEditable(false);
-        jTextArea6.setColumns(20);
-        jTextArea6.setRows(5);
-        jScrollPane7.setViewportView(jTextArea6);
-
         jLabel28.setFont(new java.awt.Font("Tahoma", 0, 48)); // NOI18N
         jLabel28.setText("INVOICE");
 
@@ -284,6 +333,12 @@ public class Billin_app extends javax.swing.JFrame {
 
         jLabel2.setText("Customer Id");
 
+        jLabel3.setText("Customer Name");
+
+        dct6.setPreferredSize(new java.awt.Dimension(100, 22));
+
+        jScrollPane1.setViewportView(jTextPane1);
+
         javax.swing.GroupLayout Bill6Layout = new javax.swing.GroupLayout(Bill6);
         Bill6.setLayout(Bill6Layout);
         Bill6Layout.setHorizontalGroup(
@@ -296,7 +351,6 @@ public class Billin_app extends javax.swing.JFrame {
                     .addGroup(Bill6Layout.createSequentialGroup()
                         .addGap(169, 169, 169)
                         .addGroup(Bill6Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING, false)
-                            .addComponent(jScrollPane7)
                             .addGroup(Bill6Layout.createSequentialGroup()
                                 .addComponent(addButton)
                                 .addGap(423, 423, 423)
@@ -304,35 +358,40 @@ public class Billin_app extends javax.swing.JFrame {
                                 .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)
                                 .addComponent(jButton3))
                             .addGroup(Bill6Layout.createSequentialGroup()
-                                .addGroup(Bill6Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
-                                    .addGroup(Bill6Layout.createSequentialGroup()
-                                        .addComponent(jLabel25)
-                                        .addGap(50, 50, 50)
-                                        .addComponent(pid5, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE)
-                                        .addGap(174, 174, 174)
-                                        .addComponent(jLabel26)
-                                        .addGap(50, 50, 50))
-                                    .addGroup(javax.swing.GroupLayout.Alignment.TRAILING, Bill6Layout.createSequentialGroup()
-                                        .addComponent(jLabel2)
-                                        .addGap(60, 60, 60)))
-                                .addGroup(Bill6Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
-                                    .addComponent(Pcnt6, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE)
-                                    .addGroup(Bill6Layout.createSequentialGroup()
-                                        .addComponent(Pcnt5, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE)
-                                        .addGap(174, 174, 174)
-                                        .addComponent(jLabel27)
-                                        .addGap(50, 50, 50)
-                                        .addComponent(dct5, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE)))))))
+                                .addComponent(jLabel25)
+                                .addGap(50, 50, 50)
+                                .addComponent(pid5, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE)
+                                .addGap(174, 174, 174)
+                                .addComponent(jLabel26)
+                                .addGap(50, 50, 50)
+                                .addComponent(Pcnt5, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE)
+                                .addGap(174, 174, 174)
+                                .addComponent(jLabel27)
+                                .addGap(50, 50, 50)
+                                .addComponent(dct5, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE))
+                            .addGroup(Bill6Layout.createSequentialGroup()
+                                .addGap(91, 91, 91)
+                                .addComponent(jLabel2)
+                                .addGap(60, 60, 60)
+                                .addComponent(Pcnt6, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE)
+                                .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)
+                                .addComponent(jLabel3)
+                                .addGap(33, 33, 33)
+                                .addComponent(dct6, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE)
+                                .addGap(170, 170, 170))
+                            .addComponent(jScrollPane1))))
                 .addContainerGap(170, Short.MAX_VALUE))
         );
         Bill6Layout.setVerticalGroup(
             Bill6Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
             .addGroup(Bill6Layout.createSequentialGroup()
-                .addContainerGap()
+                .addGap(18, 18, 18)
                 .addGroup(Bill6Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.BASELINE)
                     .addComponent(Pcnt6, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE)
-                    .addComponent(jLabel2))
-                .addGap(18, 18, 18)
+                    .addComponent(jLabel2)
+                    .addComponent(jLabel3)
+                    .addComponent(dct6, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE))
+                .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.UNRELATED)
                 .addGroup(Bill6Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
                     .addGroup(Bill6Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.BASELINE)
                         .addComponent(jLabel27)
@@ -345,9 +404,9 @@ public class Billin_app extends javax.swing.JFrame {
                         .addComponent(pid5, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE)))
                 .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
                 .addComponent(jLabel28)
-                .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)
-                .addComponent(jScrollPane7, javax.swing.GroupLayout.PREFERRED_SIZE, 578, javax.swing.GroupLayout.PREFERRED_SIZE)
                 .addGap(9, 9, 9)
+                .addComponent(jScrollPane1, javax.swing.GroupLayout.PREFERRED_SIZE, 587, javax.swing.GroupLayout.PREFERRED_SIZE)
+                .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)
                 .addGroup(Bill6Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.BASELINE)
                     .addComponent(addButton)
                     .addComponent(jButton2)
@@ -362,7 +421,7 @@ public class Billin_app extends javax.swing.JFrame {
             .addGroup(layout.createSequentialGroup()
                 .addContainerGap(javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)
                 .addComponent(Bill6, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE)
-                .addContainerGap(50, Short.MAX_VALUE))
+                .addContainerGap(javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE))
             .addGroup(javax.swing.GroupLayout.Alignment.TRAILING, layout.createSequentialGroup()
                 .addContainerGap(javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)
                 .addComponent(jLabel1, javax.swing.GroupLayout.PREFERRED_SIZE, 0, Short.MAX_VALUE)
@@ -385,9 +444,18 @@ public class Billin_app extends javax.swing.JFrame {
 
     private void jButton3ActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_jButton3ActionPerformed
         // TODO add your handling code here:
-        jTextArea6.append("Store Name\n"+new Date());
-        jTextArea6.append(pid5.getText()+ getProduct(Integer.parseInt(pid5.getText()), Integer.parseInt(Pcnt5.getText())));
-        jTextArea6.append("=============================\nTotal\t"+total);
+        StyledDocument doc = jTextPane1.getStyledDocument();
+
+        // Center alignment attribute set
+        SimpleAttributeSet center = new SimpleAttributeSet();
+        StyleConstants.setAlignment(center, StyleConstants.ALIGN_CENTER);
+        doc.setParagraphAttributes(0, doc.getLength(), center, false);
+
+        try {
+            doc.insertString(doc.getLength(), pid5.getText()+ getProduct(Integer.parseInt(pid5.getText()), Integer.parseInt(Pcnt5.getText()))+"\n", center);
+        } catch (BadLocationException e) {
+            e.printStackTrace();
+        }
         
     }//GEN-LAST:event_jButton3ActionPerformed
 
@@ -448,6 +516,7 @@ public class Billin_app extends javax.swing.JFrame {
     private javax.swing.JTextField Pcnt6;
     private javax.swing.JButton addButton;
     private javax.swing.JTextField dct5;
+    private javax.swing.JTextField dct6;
     private javax.swing.JButton jButton2;
     private javax.swing.JButton jButton3;
     private javax.swing.JLabel jLabel1;
@@ -456,16 +525,17 @@ public class Billin_app extends javax.swing.JFrame {
     private javax.swing.JLabel jLabel26;
     private javax.swing.JLabel jLabel27;
     private javax.swing.JLabel jLabel28;
+    private javax.swing.JLabel jLabel3;
     private javax.swing.JLabel jLabel5;
     private javax.swing.JLabel jLabel6;
     private javax.swing.JLabel jLabel7;
+    private javax.swing.JScrollPane jScrollPane1;
     private javax.swing.JScrollPane jScrollPane2;
-    private javax.swing.JScrollPane jScrollPane7;
     private javax.swing.JTable jTable1;
-    private javax.swing.JTextArea jTextArea6;
     private javax.swing.JTextField jTextField4;
     private javax.swing.JTextField jTextField5;
     private javax.swing.JTextField jTextField6;
+    private javax.swing.JTextPane jTextPane1;
     private javax.swing.JTextField pid5;
     // End of variables declaration//GEN-END:variables
 }

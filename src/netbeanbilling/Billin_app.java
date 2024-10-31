@@ -99,7 +99,7 @@ public class Billin_app extends javax.swing.JFrame {
         } catch (SQLException e) {
             JOptionPane.showMessageDialog(null, "Error in getting or inserting customer data: " + e.getMessage(), "ERROR", JOptionPane.ERROR_MESSAGE);
         }
-        return id + "\t" + name + "\nWallet Amount: " + wallet+"/n";
+        return id + "\t" + name + "\nWallet Amount: " + wallet+"\n";
     }
 
     // Method to update product details
@@ -451,7 +451,7 @@ public class Billin_app extends javax.swing.JFrame {
         doc.setParagraphAttributes(0, doc.getLength(), center, false);
 
         try {
-            doc.insertString(doc.getLength(), pid5.getText()+ getProduct(Integer.parseInt(pid5.getText()), Integer.parseInt(Pcnt5.getText()))+"\n", center);
+            doc.insertString(doc.getLength(), getProduct(Integer.parseInt(pid5.getText()), Integer.parseInt(Pcnt5.getText()))+"\n", center);
         } catch (BadLocationException e) {
             e.printStackTrace();
         }

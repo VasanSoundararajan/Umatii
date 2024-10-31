@@ -5,9 +5,7 @@
  */
 package netbeanbilling;
 
-import java.awt.Frame;
 import java.util.Date;
-import java.awt.print.PrinterException;
 import java.sql.*;
 import javax.swing.JOptionPane;
 import javax.swing.text.BadLocationException;
@@ -57,7 +55,7 @@ public class Billin_app extends javax.swing.JFrame {
     }
 
     // Get product details based on product ID and quantity
-    String getProduct(int id, int cnt) {
+    private String getProduct(int id, int cnt) {
         String sql = "SELECT product_name, selling_price FROM products WHERE product_id = ?";
         float price = 0, tprice = 0;
         String name = "";
@@ -77,7 +75,7 @@ public class Billin_app extends javax.swing.JFrame {
     }
 
     // Get customer data and insert new customer if not found
-    public String getData(int id) {
+    private String getData(int id) {
         String sql = "SELECT customer_name, wallet_amount FROM customers WHERE customer_id = ?";
         String name = "";
         try (PreparedStatement stmt = connection.prepareStatement(sql)) {
@@ -105,7 +103,7 @@ public class Billin_app extends javax.swing.JFrame {
     }
 
     // Method to update product details
-    public void updateProduct(int productId, String productName, double costPrice, double sellingPrice) {
+    private void updateProduct(int productId, String productName, double costPrice, double sellingPrice) {
         String sql = "UPDATE products SET product_name = ?, cost_price = ?, selling_price = ? WHERE product_id = ?";
         try (PreparedStatement stmt = connection.prepareStatement(sql)) {
             stmt.setString(1, productName);
@@ -125,7 +123,7 @@ public class Billin_app extends javax.swing.JFrame {
     }
 
     // Method to update customer billing details
-    public void updateCustomer(int customerId, float billAmount, String paymentStatus, float walletAmount) {
+    private void updateCustomer(int customerId, float billAmount, String paymentStatus, float walletAmount) {
         String sql = "UPDATE customers SET bill_amount = ?, payment_status = ?, wallet_amount = ? WHERE customer_id = ?";
         try (PreparedStatement stmt = connection.prepareStatement(sql)) {
             stmt.setFloat(1, billAmount);
@@ -145,13 +143,13 @@ public class Billin_app extends javax.swing.JFrame {
     }
 
     // Method to apply updates after printing
-    void update() {
+    private void update() {
         int customerId = Integer.parseInt("CustomerIDHere"); // Replace with actual input for customer ID
         updateCustomer(customerId, total, "Paid", wallet + (total / 100));
     }
 
     // Print bill to JTextArea and update customer if successful
-    public void printBill(String details) {
+    private void printBill(String details) {
         try { // Initialize JTextArea for example
             StyledDocument doc = jTextPane1.getStyledDocument();
 
@@ -466,12 +464,13 @@ public class Billin_app extends javax.swing.JFrame {
 
     private void addButtonActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_addButtonActionPerformed
         // TODO add your handling code here:
-        
         printBill(getData(Integer.parseInt(Pcnt6.getText())));
     }//GEN-LAST:event_addButtonActionPerformed
 
     private void Pcnt6PcntActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_Pcnt6PcntActionPerformed
-        // TODO add your handling code here:
+        // TODO add your handling code here:m
+        
+        
     }//GEN-LAST:event_Pcnt6PcntActionPerformed
 
     /**
